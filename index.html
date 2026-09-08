@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#F3E9DD" />
+    <meta name="description" content="转动桥梁，走过不可能的道路。一个可以离线游玩的空间谜题。" />
+    <link rel="icon" href="data:," />
+    <title>回光庭院</title>
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="scene" aria-label="回光庭院游戏场景，点击路面移动旅人"></canvas>
+      <header class="header">
+        <a class="wordmark" href="./" aria-label="回光庭院，重新开始"><span class="wordmark-symbol">◇</span> 回光庭院</a>
+        <div class="chapter-controls"><label for="chapter-select">章节</label><select id="chapter-select" class="quiet-button" aria-label="选择关卡"></select><button id="reset" class="quiet-button" hidden><span aria-hidden="true">↺</span> 重新开始</button></div>
+      </header>
+      <section id="intro" class="intro" aria-labelledby="intro-title">
+        <span class="chapter">第一章</span>
+        <h1 id="intro-title">回光<br />庭院</h1>
+        <p class="intro-line">路的尽头，<br />也许是另一段开始。</p>
+        <button id="start" class="primary-button">走进庭院 <span aria-hidden="true">↗</span></button>
+        <p class="intro-help">点击行走 · 转动桥梁 · 抵达光门</p>
+      </section>
+      <button id="rotate" class="rotate-control" aria-label="转动桥梁" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M19 8a8 8 0 1 0 1 7M19 3v5h-5"/></svg><span>转动</span></button>
+      <button id="aux-control" class="rotate-control" aria-label="移动灯台" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4m10-8 4 4-4 4"/></svg><span>移动灯台</span></button>
+      <div id="hint" class="hint" role="status" aria-live="polite" hidden></div>
+      <div class="footer"><span>一座庭院，一个小小的谜题</span><span id="footer-state">慢一点，换个角度看</span></div>
+      <section id="ending" class="ending" aria-labelledby="ending-title" hidden>
+        <span class="chapter">第一章 · 已抵达</span>
+        <h2 id="ending-title">光，一直都在。</h2>
+        <p>有时，前行需要先回到中间。</p>
+        <button id="next" class="primary-button" hidden>下一关 <span aria-hidden="true">↗</span></button>
+        <button id="replay" class="quiet-button">再走一次 <span aria-hidden="true">↺</span></button>
+      </section>
+      <section id="error" class="error-panel" role="alert" hidden><h2>暂时无法打开庭院</h2><p id="error-message"></p><button id="reload" class="primary-button">重新加载</button></section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

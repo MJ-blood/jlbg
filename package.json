@@ -1,0 +1,22 @@
+{
+  "name": "jlbg",
+  "version": "1.0.0",
+  "description": "回光庭院：可离线游玩的浏览器空间解谜游戏",
+  "private": true,
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build --emptyOutDir false",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "vite": "^8.2.2"
+  }
+}
