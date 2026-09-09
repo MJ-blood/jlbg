@@ -29,9 +29,11 @@ export function createInput(canvas, camera, level, game, onChange, onTarget) {
   }
   canvas.addEventListener('pointermove', pointerMove);
   canvas.addEventListener('click', click);
-  return () => {
+  const dispose = () => {
     canvas.removeEventListener('pointermove', pointerMove);
     canvas.removeEventListener('click', click);
     canvas.style.cursor = 'default';
   };
+  dispose.pick = (x, y) => targetAt({ clientX: x, clientY: y });
+  return dispose;
 }

@@ -4,18 +4,19 @@ import { LEVELS } from './levels.js';
 import { createLevel as createFirst, PALETTE } from './level-01.js';
 import { createLevel as createTower } from './level-02.js';
 import { createLevel as createLantern } from './level-03.js';
+import { createAdvanced } from './level-advanced.js';
 import { disposeLevel } from './world.js';
 import { createInput } from './input.js';
 import './style.css';
 
-const factories = [createFirst, createTower, createLantern];
-const ui = Object.fromEntries(['scene', 'intro', 'start', 'reset', 'rotate', 'aux-control', 'hint', 'ending', 'replay', 'next', 'chapter-select', 'error', 'error-message', 'reload', 'footer-state'].map((id) => [id, document.getElementById(id)]));
+const factories = [createFirst, createTower, createLantern, ...[3, 4, 5].map((index) => (scene) => createAdvanced(scene, index))];
+const ui = Object.fromEntries(['scene', 'intro', 'start', 'reset', 'rotate', 'aux-control', 'hint', 'ending', 'replay', 'next', 'chapter-select', 'error', 'error-message', 'reload', 'footer-state', 'action-dock', 'action-buttons', 'mechanism-state', 'help'].map((id) => [id, document.getElementById(id)]));
 ui.reload.addEventListener('click', () => location.reload());
 
 function showError(message) {
   ui['error-message'].textContent = message;
   ui.error.hidden = false;
-  for (const name of ['intro', 'ending', 'rotate', 'aux-control', 'hint', 'reset']) ui[name].hidden = true;
+  for (const name of ['intro', 'ending', 'action-dock', 'reset']) ui[name].hidden = true;
   ui['chapter-select'].disabled = true;
 }
 
@@ -31,36 +32,34 @@ function boot() {
   sun.position.set(-4, 10, 8);
   scene.add(sun);
   const camera = new THREE.OrthographicCamera(-10, 10, 7, -7, 0.1, 100);
-  let level, game, removeInput;
+  let level, game, removeInput, viewBounds;
   let index = 0, last = performance.now(), clock = 0, previousUI = '', targetUntil = 0;
   let contextLost = false;
+  const actionButtons = [ui.rotate, ui['aux-control']];
 
   function project(position) {
     const p = new THREE.Vector3(...position).project(camera);
-    return { x: (p.x + 1) * window.innerWidth / 2, y: (1 - p.y) * window.innerHeight / 2 };
-  }
-  function positionControl() {
-    for (const [button, position] of [[ui.rotate, level.handlePosition], [ui['aux-control'], level.auxPosition]]) {
-      if (!position) continue;
-      const p = project(position.toArray());
-      button.style.left = `${p.x - (button === ui['aux-control'] ? 70 : 12)}px`;
-      button.style.top = `${p.y - (button === ui['aux-control'] ? 60 : 45)}px`;
-    }
+    const rect = ui.scene.getBoundingClientRect();
+    return { x: rect.left + (p.x + 1) * rect.width / 2, y: rect.top + (1 - p.y) * rect.height / 2 };
   }
   function resize() {
-    const w = window.innerWidth, h = window.innerHeight;
+    if (!game || contextLost) return;
+    const top = document.querySelector('.header').getBoundingClientRect().bottom + 12;
+    const bottom = ui['action-dock'].getBoundingClientRect().top - 12;
+    const w = window.innerWidth, h = Math.max(160, bottom - top);
+    ui.scene.style.top = `${top}px`;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h);
-    const halfHeight = w < 760 ? Math.max(9, game.level.halfHeight) : game.level.halfHeight;
+    const halfHeight = Math.max((viewBounds.maxY - viewBounds.minY) / 2 + 0.65, ((viewBounds.maxX - viewBounds.minX) / 2 + 0.8) / (w / h));
     const halfWidth = halfHeight * w / h;
-    const offset = w >= 1000 ? halfWidth * 0.23 : 0;
-    camera.left = -halfWidth - offset;
-    camera.right = halfWidth - offset;
-    camera.top = halfHeight;
-    camera.bottom = -halfHeight;
+    const offset = w >= 1000 ? Math.min(halfWidth * 0.16, halfWidth - (viewBounds.maxX - viewBounds.minX) / 2 - 0.4) : 0;
+    const cx = (viewBounds.minX + viewBounds.maxX) / 2 - offset, cy = (viewBounds.minY + viewBounds.maxY) / 2;
+    camera.left = cx - halfWidth;
+    camera.right = cx + halfWidth;
+    camera.top = cy + halfHeight;
+    camera.bottom = cy - halfHeight;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
-    positionControl();
   }
   function syncUI() {
     if (contextLost) return;
@@ -74,18 +73,29 @@ function boot() {
     ui.ending.hidden = game.phase !== 'won';
     ui.next.hidden = game.phase !== 'won' || index === factories.length - 1;
     const inactive = ['intro', 'finishing', 'won'].includes(game.phase);
-    for (const [button, action] of [[ui.rotate, Object.keys(game.level.actions)[0]], [ui['aux-control'], 'lamp']]) {
+    const actions = Object.keys(game.level.actions);
+    for (let i = 0; i < actionButtons.length; i++) {
+      const button = actionButtons[i], action = actions[i];
       button.hidden = inactive || !game.level.actions[action];
+      if (!action) continue;
+      button.dataset.action = action;
       const ready = game.canAct(action);
       button.classList.toggle('ready', ready);
       button.setAttribute('aria-disabled', String(!ready));
       button.classList.toggle('turning', Boolean(game.action));
+      const rule = game.level.actions[action];
+      const fallback = action === 'lamp' ? game.lamp === 'left' ? '移向右板' : '移向左板'
+        : game.level.id === 2 ? game.height === 'low' ? '升起塔台' : '降下塔台' : '转动桥梁';
+      const label = typeof rule.label === 'function' ? rule.label(game) : rule.label || fallback;
+      button.querySelector('span').textContent = label;
+      button.setAttribute('aria-label', label);
+      button.title = ready ? label : rule.invalid;
     }
-    const primaryText = game.level.id === 2 ? game.height === 'low' ? '升起塔台' : '降下塔台' : '转动桥梁';
-    ui.rotate.setAttribute('aria-label', primaryText);
-    ui.rotate.querySelector('span').textContent = primaryText;
     ui.rotate.querySelector('path').setAttribute('d', game.level.id === 2 ? 'M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5' : 'M19 8a8 8 0 1 0 1 7M19 3v5h-5');
-    ui['aux-control'].querySelector('span').textContent = game.lamp === 'left' ? '移向右板' : '移向左板';
+    ui.help.hidden = inactive || !game.level.hints;
+    ui.help.disabled = game.phase !== 'idle';
+    ui.help.textContent = game.hintStep ? '进一步提示' : '查看提示';
+    ui['mechanism-state'].textContent = inactive ? '' : game.level.status?.(game) || '到圆形控制台操作机关';
     ui.hint.hidden = inactive;
     ui.hint.textContent = game.hint;
     ui['footer-state'].textContent = game.phase === 'won' ? '每一步，都有新的可能' : game.phase === 'intro' ? '慢一点，换个角度看' : '点击路面行走';
@@ -106,6 +116,17 @@ function boot() {
     const center = new THREE.Vector3(...game.level.center);
     camera.position.copy(center).add(new THREE.Vector3(14, 14, 14));
     camera.lookAt(center);
+    camera.updateMatrixWorld(); level.root.updateMatrixWorld(true);
+    viewBounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+    level.root.traverse((object) => {
+      if (!object.isMesh || object === level.destination || !object.visible) return;
+      object.geometry.computeBoundingBox(); const { min, max } = object.geometry.boundingBox;
+      for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) {
+        const v = new THREE.Vector3(x, y, z).applyMatrix4(object.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
+        viewBounds.minX = Math.min(viewBounds.minX, v.x); viewBounds.maxX = Math.max(viewBounds.maxX, v.x);
+        viewBounds.minY = Math.min(viewBounds.minY, v.y); viewBounds.maxY = Math.max(viewBounds.maxY, v.y);
+      }
+    });
     const title = document.getElementById('intro-title');
     title.replaceChildren(document.createTextNode(game.level.titleLines[0]), document.createElement('br'), document.createTextNode(game.level.titleLines[1]));
     ui.intro.querySelector('.chapter').textContent = game.level.chapter;
@@ -116,7 +137,7 @@ function boot() {
     ui.ending.querySelector('.chapter').textContent = game.level.chapter + ' · 已抵达';
     document.getElementById('ending-title').textContent = game.level.ending;
     ui.ending.querySelector('p').textContent = game.level.endingLine;
-    document.querySelector('.footer span').textContent = game.level.chapter + ' / 三章 · ' + game.level.title;
+    document.querySelector('.footer span').textContent = game.level.chapter + ' / 六章 · ' + game.level.title;
     ui.next.firstChild.textContent = index + 1 < factories.length ? '下一关 · ' + LEVELS[index + 1].title + ' ' : '';
     ui['chapter-select'].value = String(index);
     ui.scene.setAttribute('aria-label', game.level.title + '游戏场景，点击路面移动旅人');
@@ -129,7 +150,11 @@ function boot() {
       level.destination.visible = true;
       targetUntil = clock + (accepted ? 10 : 0.7);
     });
-    resize(); syncUI();
+    while (actionButtons.length < Object.keys(game.level.actions).length) {
+      const button = ui['aux-control'].cloneNode(true); button.removeAttribute('id');
+      ui['action-buttons'].insertBefore(button, ui.help); actionButtons.push(button);
+    }
+    syncUI(); resize();
   }
   for (let i = 0; i < factories.length; i++) {
     const option = document.createElement('option');
@@ -139,10 +164,16 @@ function boot() {
   ui['chapter-select'].addEventListener('change', () => loadChapter(Number(ui['chapter-select'].value)));
   ui.next.addEventListener('click', () => { if (game.phase === 'won') loadChapter(index + 1); });
   ui.start.addEventListener('click', () => { game.start(); syncUI(); });
-  ui.rotate.addEventListener('click', () => { game.act(Object.keys(game.level.actions)[0]); syncUI(); });
-  ui['aux-control'].addEventListener('click', () => { game.act('lamp'); syncUI(); });
+  ui['action-buttons'].addEventListener('click', (event) => {
+    const button = event.target.closest('[data-action]');
+    if (button) { game.act(button.dataset.action); syncUI(); }
+  });
+  ui.help.addEventListener('click', () => { game.requestHint(); syncUI(); });
   for (const button of [ui.reset, ui.replay]) button.addEventListener('click', reset);
   window.addEventListener('resize', resize);
+  const layoutObserver = new ResizeObserver(resize);
+  layoutObserver.observe(ui['action-dock']);
+  layoutObserver.observe(document.querySelector('.header'));
   document.addEventListener('visibilitychange', () => { last = performance.now(); });
   ui.scene.addEventListener('webglcontextlost', (event) => {
     event.preventDefault(); contextLost = true;
@@ -171,7 +202,9 @@ function boot() {
   if (import.meta.env.DEV) window.__courtyard = {
     snapshot: () => game.snapshot(),
     project: (node) => project(game.positionOf(node)),
-    seam: () => ({ near: project(game.positionOf(game.level.seam[0])), far: project(game.positionOf(game.level.seam[1])) }),
+    seam: () => game.level.seam.length ? ({ near: project(game.positionOf(game.level.seam[0])), far: project(game.positionOf(game.level.seam[1])) }) : null,
+    stops: () => game.level.stops.map((node) => ({ node, ...project(game.positionOf(node)) })),
+    pick: (x, y) => removeInput.pick(x, y),
     renderer: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
       geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
       version: renderer.getContext().getParameter(renderer.getContext().VERSION) }),

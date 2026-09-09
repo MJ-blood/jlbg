@@ -32,7 +32,10 @@ export class Game {
   get bridgeAngle() { return this.visuals.bridgeAngle || 0; }
   positionOf(node) { return this.level.position(node, this.state); }
   edges() { return this.level.edges(this.state); }
-  canAct(id) { return this.phase === 'idle' && Boolean(this.level.actions[id]?.nodes.includes(this.node)); }
+  canAct(id) {
+    const rule = this.level.actions[id];
+    return this.phase === 'idle' && Boolean(rule?.nodes.includes(this.node)) && (!rule.available || rule.available(this.state, this.node));
+  }
 
   reset() {
     this.phase = 'intro';
@@ -52,6 +55,7 @@ export class Game {
     this.crossings = 0;
     this.finishProgress = 0;
     this.visited = new Set();
+    this.hintStep = 0;
     this.hint = this.level.initialHint;
   }
 
@@ -75,11 +79,19 @@ export class Game {
 
   rotate() { return this.act('rotate'); }
 
+  requestHint() {
+    if (this.phase !== 'idle' || !this.level.hints) return false;
+    const hints = this.level.hints(this);
+    this.hint = hints[Math.min(this.hintStep, hints.length - 1)];
+    this.hintStep = Math.min(this.hintStep + 1, hints.length - 1);
+    return true;
+  }
+
   act(id) {
     if (this.phase !== 'idle') return false;
     const rule = this.level.actions[id];
     if (!rule) return false;
-    if (!rule.nodes.includes(this.node)) { this.hint = rule.invalid; return false; }
+    if (!this.canAct(id)) { this.hint = rule.invalid; return false; }
     this.action = { id, to: { ...this.state, ...rule.change(this.state) } };
     this.phase = rule.phase;
     this.elapsed = 0;
@@ -98,7 +110,11 @@ export class Game {
       const progress = Math.min(this.elapsed / rule.duration, 1);
       const t = ease(progress);
       const from = this.level.visuals(this.state), to = this.level.visuals(this.action.to);
-      for (const key of Object.keys(from)) this.visuals[key] = from[key] + (to[key] - from[key]) * t;
+      for (const key of Object.keys(from)) {
+        let delta = to[key] - from[key];
+        if (this.level.angleKeys?.includes(key)) delta = Math.atan2(Math.sin(delta), Math.cos(delta));
+        this.visuals[key] = from[key] + delta * t;
+      }
       // A rider is carried by the same transform as the moving architecture.
       const p = this.positionOf(this.node), q = this.level.position(this.node, this.action.to);
       this.position = p.map((v, i) => v + (q[i] - v) * t);
@@ -126,6 +142,13 @@ export class Game {
         this.position = from.map((v, i) => v + (to[i] - v) * t);
         if (this.level.id === 2 && ['T', 'C'].includes(this.node) && ['T', 'C'].includes(next)) {
           this.position[1] = stairHeight(this.position[2]);
+        }
+        if (this.level.id >= 4 && !seam && from[1] !== to[1]) {
+          // Each new staircase shares this tread count with the scene builder.
+          const steps = Math.ceil(Math.abs(to[1] - from[1]) / 0.16);
+          const lower = Math.min(from[1], to[1]), rise = Math.abs(to[1] - from[1]);
+          const uphill = to[1] > from[1] ? t : 1 - t;
+          this.position[1] = lower + Math.floor(uphill * steps + 1e-8) * rise / steps;
         }
         if (t < 1) break;
         this.node = next;

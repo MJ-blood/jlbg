@@ -22,9 +22,15 @@
         <button id="start" class="primary-button">走进庭院 <span aria-hidden="true">↗</span></button>
         <p class="intro-help">点击行走 · 转动桥梁 · 抵达光门</p>
       </section>
-      <button id="rotate" class="rotate-control" aria-label="转动桥梁" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M19 8a8 8 0 1 0 1 7M19 3v5h-5"/></svg><span>转动</span></button>
-      <button id="aux-control" class="rotate-control" aria-label="移动灯台" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4m10-8 4 4-4 4"/></svg><span>移动灯台</span></button>
-      <div id="hint" class="hint" role="status" aria-live="polite" hidden></div>
+      <section id="action-dock" class="action-dock" aria-label="机关操作区">
+        <p id="mechanism-state" class="mechanism-state"></p>
+        <div id="action-buttons" class="action-buttons">
+          <button id="rotate" class="rotate-control" aria-label="转动桥梁" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M19 8a8 8 0 1 0 1 7M19 3v5h-5"/></svg><span>转动</span></button>
+          <button id="aux-control" class="rotate-control" aria-label="移动灯台" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 12h18M7 8l-4 4 4 4m10-8 4 4-4 4"/></svg><span>移动灯台</span></button>
+          <button id="help" class="quiet-button" hidden>查看提示</button>
+        </div>
+        <div id="hint" class="hint" role="status" aria-live="polite" hidden></div>
+      </section>
       <div class="footer"><span>一座庭院，一个小小的谜题</span><span id="footer-state">慢一点，换个角度看</span></div>
       <section id="ending" class="ending" aria-labelledby="ending-title" hidden>
         <span class="chapter">第一章 · 已抵达</span>

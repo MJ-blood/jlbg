@@ -1,3 +1,5 @@
+import { ADVANCED_LEVELS } from './advanced-levels.js';
+
 const firstPositions = {
   S: [0, 0, -9], W: [0, 0, -7], I: [0, 0, -5], H: [0, 0, 0],
   R1: [2, 0, 0], R2: [4, 0, 0], Q: [6, 2, 2],
@@ -98,6 +100,7 @@ export const LEVELS = [
       ? game.lamp === 'right' && game.orientation === 'B' ? '门与桥都接上了，走向光门' : '出口需要右压板，也需要桥接向高处'
       : game.lamp === 'left' && game.orientation === 'A' ? '入口接通了，走到中间的圆台' : '入口需要左压板，也需要桥转向这里',
   },
+  ...ADVANCED_LEVELS,
 ];
 
 // The visible treads and the traveller use the same staircase height profile.
