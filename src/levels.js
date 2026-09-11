@@ -1,4 +1,10 @@
 import { ADVANCED_LEVELS } from './advanced-levels.js';
+import { VIEWPOINT_LEVEL } from './viewpoint-level.js';
+import { MIRROR_LEVEL } from './mirror-level.js';
+import { FOLD_LEVEL } from './fold-level.js';
+import { COMPANION_LEVEL } from './companion-level.js';
+import { FOLD_MIRROR_LEVEL } from './fold-mirror-level.js';
+import { FINALE_LEVEL } from './finale-level.js';
 
 const firstPositions = {
   S: [0, 0, -9], W: [0, 0, -7], I: [0, 0, -5], H: [0, 0, 0],
@@ -101,6 +107,12 @@ export const LEVELS = [
       : game.lamp === 'left' && game.orientation === 'A' ? '入口接通了，走到中间的圆台' : '入口需要左压板，也需要桥转向这里',
   },
   ...ADVANCED_LEVELS,
+  VIEWPOINT_LEVEL,
+  MIRROR_LEVEL,
+  FOLD_LEVEL,
+  COMPANION_LEVEL,
+  FOLD_MIRROR_LEVEL,
+  FINALE_LEVEL,
 ];
 
 // The visible treads and the traveller use the same staircase height profile.

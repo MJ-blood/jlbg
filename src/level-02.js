@@ -17,6 +17,13 @@ export function createLevel(scene) {
   marker(p.P, 'P', tower);
   box([1.6, 1.72, 1.6], [0, -1.14, 0], m.blue, null, tower);
   box([1.76, 0.12, 1.76], [0, -1.98, 0], m.gold, null, tower);
+  world.insetArch([0, -1.87, 0.806], 0.66, 1.16, 0, tower);
+  world.insetArch([0.806, -1.87, 0], 0.66, 1.16, Math.PI / 2, tower);
+  box([1.73, 0.10, 1.73], [0, -0.40, 0], m.trim, null, tower);
+  for (const x of [-1.14, 1.14]) {
+    box([0.24, 0.34, 0.25], [x, -0.48, 0.85], m.trim, null, tower);
+    box([0.28, 0.055, 0.29], [x, -0.3, 0.85], m.gold, null, tower);
+  }
   // The lower ledge is a separate floor, two units below the boarding deck.
   box([1.1, 0.28, 1.8], [0, -2.14, 1.5], m.stone, ['V'], tower);
   floor([-1, -2, 2], [0.45, -2, 2], ['V'], 1.1, tower);
@@ -27,6 +34,7 @@ export function createLevel(scene) {
     box([0.26, 0.16, 0.26], [x, 4.07, 0.85], m.stone);
   }
   box([2.7, 0.25, 2.7], [0, -3.32, 0], m.blue);
+  box([2.85, 0.12, 2.85], [0, -3.50, 0], m.trim);
   floor([1, 4, 0], p.T, ['U', 'T']);
   pad(p.U, 'U'); pad(p.T, 'T');
   support(p.T, 5.4);

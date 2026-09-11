@@ -42,6 +42,11 @@ export function createAdvanced(scene, index) {
     const frame = new THREE.Group(); frame.position.set(...position); frame.rotation.y = yaw; root.add(frame);
     for (const x of [-0.67, 0.67]) box([0.14, 2.35, 0.16], [x, 1.175, 0], m.stone, null, frame);
     box([1.48, 0.14, 0.22], [0, 2.35, 0], m.gold, null, frame);
+    for (const x of [-0.67, 0.67]) {
+      box([0.24, 0.12, 0.28], [x, 0.08, 0], m.trim, null, frame);
+      box([0.22, 0.10, 0.26], [x, 2.21, 0], m.white, null, frame);
+    }
+    box([1.57, 0.065, 0.30], [0, 2.45, 0], m.stone, null, frame);
     const bars = new THREE.Group(); frame.add(bars);
     for (const x of [-0.44, -0.22, 0, 0.22, 0.44]) box([0.04, 1.5, 0.055], [x, 0.79, 0], m.gold, null, bars);
     const signal = mesh(symbol === 'entry' ? new THREE.OctahedronGeometry(0.18) : new THREE.SphereGeometry(0.17, 16, 12), m.white.clone(), [0, 2.7, 0], null, frame);
@@ -52,13 +57,29 @@ export function createAdvanced(scene, index) {
     box([1.48, 2.65, 1.48], [0, -1.605, 0], m.blue, null, group);
     box([1.85, 0.28, 1.85], [0, -0.14, 0], m.stone, ['P'], group);
     box([1.72, 0.16, 1.72], [0, -2.99, 0], m.mint, null, group);
-    for (const x of [-0.29, 0.29]) box([0.11, 0.13, 0.03], [x, -0.86, 0.753], m.gold, null, group);
+    box([1.62, 0.10, 1.62], [0, -0.40, 0], m.trim, null, group);
+    box([1.58, 0.12, 1.58], [0, -2.83, 0], m.gold, null, group);
+    // The face and carved side panels move with the idol, below its flat boarding deck.
+    box([1.12, 0.87, 0.085], [0, -1.03, 0.755], m.trim, null, group);
+    box([0.97, 0.70, 0.055], [0, -1.03, 0.805], m.recess, null, group);
+    for (const x of [-0.27, 0.27]) {
+      const eye = mesh(new THREE.SphereGeometry(0.078, 20, 12), m.gold, [x, -0.94, 0.851], null, group);
+      eye.scale.set(1, 0.78, 0.32);
+      box([0.22, 0.035, 0.055], [x, -0.78, 0.83], m.stone, null, group);
+    }
+    box([0.18, 0.038, 0.045], [0, -1.22, 0.849], m.trim, null, group);
+    world.insetArch([0.746, -2.56, 0], 0.59, 1.70, Math.PI / 2, group);
+    world.insetArch([-0.746, -2.56, 0], 0.59, 1.70, -Math.PI / 2, group);
+    const seal = mesh(new THREE.OctahedronGeometry(0.17), m.gold, [0, -1.91, 0.77], null, group);
+    seal.scale.set(0.8, 1.2, 0.3);
     marker([0, 0, 0], 'P', group);
     const min = Math.min(...xs), max = Math.max(...xs);
     box([max - min + 2.3, 0.28, 2.1], [(min + max) / 2, y - 3.3, z], m.blue);
     for (const offset of [-0.52, 0.52]) box([max - min + 1.8, 0.035, 0.04], [(min + max) / 2, y - 3.135, z + offset], m.gold);
     const plates = xs.map((x, i) => {
       const plate = cylinder(0.64, 0.06, [x, y - 3.11, z], m.white.clone());
+      const rim = mesh(new THREE.TorusGeometry(0.67, 0.023, 8, 48), m.gold, [x, y - 3.09, z]);
+      rim.rotation.x = -Math.PI / 2;
       if (names[i]) label(names[i], [x, y - 3.9, z]);
       return plate;
     });
@@ -73,6 +94,10 @@ export function createAdvanced(scene, index) {
     const inner = new THREE.Group(), outer = new THREE.Group(); root.add(inner, outer);
     // Narrow metallic hoops are supports, not walkable stone floors.
     torus(2.1, -0.8, m.gold, inner); torus(5, -0.8, m.mint, outer);
+    for (const [group, r, mat] of [[inner, 2.1, m.gold], [outer, 5, m.mint]]) {
+      const lower = torus(r, -1.02, mat, group); lower.scale.z = 0.65;
+      for (let i = 0; i < 8; i++) cylinder(0.035, 0.22, radial(r, i / 2, -0.91), mat, null, group);
+    }
     const innerTargets = definition.id === 4 ? ['H', 'M0', 'M1', 'M2', 'M3'] : ['M0', 'M1', 'M2', 'M3'];
     floor([definition.id === 4 ? 0.8 : 2.45, 0, 0], [3.2, 0, 0], innerTargets, 1.0, inner);
     floor([3.2, 0, 0], [6.6, 0, 0], ['M0', 'M1', 'M2', 'M3', 'B0', 'B1', 'B3', definition.id === 4 ? 'W' : 'B2'], 1.0, outer);
@@ -118,6 +143,8 @@ export function createAdvanced(scene, index) {
       floor([-5, 0, -3.6], [-5, 0, -2.5], ['W']);
       const idol = stone(0, -1.6, [0, -5], ['接驳位', '锁定压板']);
       const latch = box([0.34, 0.6, 0.34], [-3.2, -0.55, -0.7], m.gold);
+      box([0.53, 0.11, 0.52], [-3.2, -0.91, -0.7], m.trim);
+      for (const x of [-3.44, -2.96]) box([0.09, 0.54, 0.43], [x, -0.70, -0.7], m.stone);
       const signal = mesh(new THREE.OctahedronGeometry(0.18), m.white.clone(), [-5.7, 0.55, -3.6]);
       const remote = world.wheel([-5.55, 0.55, -3.2], 'rotate');
       update = (g) => {

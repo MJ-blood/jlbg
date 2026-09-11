@@ -5,11 +5,17 @@ import { createLevel as createFirst, PALETTE } from './level-01.js';
 import { createLevel as createTower } from './level-02.js';
 import { createLevel as createLantern } from './level-03.js';
 import { createAdvanced } from './level-advanced.js';
+import { createLevel as createViewpoint } from './level-07.js';
+import { createLevel as createMirror } from './level-08.js';
+import { createLevel as createFold } from './level-09.js';
+import { createLevel as createCompanion } from './level-10.js';
+import { createLevel as createFoldMirror } from './level-11.js';
+import { createLevel as createFinale } from './level-12.js';
 import { disposeLevel } from './world.js';
 import { createInput } from './input.js';
 import './style.css';
 
-const factories = [createFirst, createTower, createLantern, ...[3, 4, 5].map((index) => (scene) => createAdvanced(scene, index))];
+const factories = [createFirst, createTower, createLantern, ...[3, 4, 5].map((index) => (scene) => createAdvanced(scene, index)), createViewpoint, createMirror, createFold, createCompanion, createFoldMirror, createFinale];
 const ui = Object.fromEntries(['scene', 'intro', 'start', 'reset', 'rotate', 'aux-control', 'hint', 'ending', 'replay', 'next', 'chapter-select', 'error', 'error-message', 'reload', 'footer-state', 'action-dock', 'action-buttons', 'mechanism-state', 'help'].map((id) => [id, document.getElementById(id)]));
 ui.reload.addEventListener('click', () => location.reload());
 
@@ -27,20 +33,28 @@ function boot() {
   renderer.setClearColor(PALETTE.background, 0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight('#fff7e9', '#899cad', 2.4));
-  const sun = new THREE.DirectionalLight('#fff5db', 2.4);
+  const sky = new THREE.HemisphereLight('#fff7e9', '#899cad', 1.8);
+  scene.add(sky);
+  const sun = new THREE.DirectionalLight('#fff5db', 2.7);
   sun.position.set(-4, 10, 8);
   scene.add(sun);
   const camera = new THREE.OrthographicCamera(-10, 10, 7, -7, 0.1, 100);
   let level, game, removeInput, viewBounds;
   let index = 0, last = performance.now(), clock = 0, previousUI = '', targetUntil = 0;
   let contextLost = false;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const actionButtons = [ui.rotate, ui['aux-control']];
 
   function project(position) {
     const p = new THREE.Vector3(...position).project(camera);
     const rect = ui.scene.getBoundingClientRect();
     return { x: rect.left + (p.x + 1) * rect.width / 2, y: rect.top + (1 - p.y) * rect.height / 2 };
+  }
+  function aimCamera(yaw) {
+    const center = new THREE.Vector3(...game.level.center);
+    camera.position.copy(center).add(new THREE.Vector3(Math.sin(yaw) * Math.SQRT2 * 14, 14, Math.cos(yaw) * Math.SQRT2 * 14));
+    camera.lookAt(center);
+    camera.updateMatrixWorld();
   }
   function resize() {
     if (!game || contextLost) return;
@@ -91,7 +105,8 @@ function boot() {
       button.setAttribute('aria-label', label);
       button.title = ready ? label : rule.invalid;
     }
-    ui.rotate.querySelector('path').setAttribute('d', game.level.id === 2 ? 'M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5' : 'M19 8a8 8 0 1 0 1 7M19 3v5h-5');
+    ui.rotate.querySelector('path').setAttribute('d', game.level.id === 7 ? 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0'
+      : game.level.id === 2 ? 'M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5' : 'M19 8a8 8 0 1 0 1 7M19 3v5h-5');
     ui.help.hidden = inactive || !game.level.hints;
     ui.help.disabled = game.phase !== 'idle';
     ui.help.textContent = game.hintStep ? '进一步提示' : '查看提示';
@@ -101,6 +116,8 @@ function boot() {
     ui['footer-state'].textContent = game.phase === 'won' ? '每一步，都有新的可能' : game.phase === 'intro' ? '慢一点，换个角度看' : '点击路面行走';
     document.body.dataset.phase = game.phase;
     document.body.dataset.level = game.level.id;
+    document.body.dataset.realm = game.state.realm || '';
+    document.body.dataset.actor = game.state.active || '';
   }
   function reset() {
     game.reset(); targetUntil = 0; level.destination.visible = false;
@@ -118,15 +135,22 @@ function boot() {
     camera.lookAt(center);
     camera.updateMatrixWorld(); level.root.updateMatrixWorld(true);
     viewBounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
-    level.root.traverse((object) => {
-      if (!object.isMesh || object === level.destination || !object.visible) return;
-      object.geometry.computeBoundingBox(); const { min, max } = object.geometry.boundingBox;
-      for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) {
-        const v = new THREE.Vector3(x, y, z).applyMatrix4(object.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
-        viewBounds.minX = Math.min(viewBounds.minX, v.x); viewBounds.maxX = Math.max(viewBounds.maxX, v.x);
-        viewBounds.minY = Math.min(viewBounds.minY, v.y); viewBounds.maxY = Math.max(viewBounds.maxY, v.y);
-      }
-    });
+    // Fit the entire orbit once; changing angle never pumps the orthographic zoom.
+    const angles = game.visuals.cameraYaw === undefined ? [Math.PI / 4]
+      : Array.from({ length: 13 }, (_, i) => -Math.PI / 4 + i * Math.PI / 24);
+    for (const angle of angles) {
+      if (game.visuals.cameraYaw !== undefined) aimCamera(angle);
+      level.root.traverse((object) => {
+        if (!object.isMesh || object === level.destination || !object.visible) return;
+        object.geometry.computeBoundingBox(); const { min, max } = object.geometry.boundingBox;
+        for (const x of [min.x, max.x]) for (const y of [min.y, max.y]) for (const z of [min.z, max.z]) {
+          const v = new THREE.Vector3(x, y, z).applyMatrix4(object.matrixWorld).applyMatrix4(camera.matrixWorldInverse);
+          viewBounds.minX = Math.min(viewBounds.minX, v.x); viewBounds.maxX = Math.max(viewBounds.maxX, v.x);
+          viewBounds.minY = Math.min(viewBounds.minY, v.y); viewBounds.maxY = Math.max(viewBounds.maxY, v.y);
+        }
+      });
+    }
+    if (game.visuals.cameraYaw !== undefined) aimCamera(game.visuals.cameraYaw);
     const title = document.getElementById('intro-title');
     title.replaceChildren(document.createTextNode(game.level.titleLines[0]), document.createElement('br'), document.createTextNode(game.level.titleLines[1]));
     ui.intro.querySelector('.chapter').textContent = game.level.chapter;
@@ -137,7 +161,7 @@ function boot() {
     ui.ending.querySelector('.chapter').textContent = game.level.chapter + ' · 已抵达';
     document.getElementById('ending-title').textContent = game.level.ending;
     ui.ending.querySelector('p').textContent = game.level.endingLine;
-    document.querySelector('.footer span').textContent = game.level.chapter + ' / 六章 · ' + game.level.title;
+    document.querySelector('.footer span').textContent = game.level.chapter + ' / ' + factories.length + '章 · ' + game.level.title;
     ui.next.firstChild.textContent = index + 1 < factories.length ? '下一关 · ' + LEVELS[index + 1].title + ' ' : '';
     ui['chapter-select'].value = String(index);
     ui.scene.setAttribute('aria-label', game.level.title + '游戏场景，点击路面移动旅人');
@@ -185,15 +209,21 @@ function boot() {
     last = now;
     if (document.hidden || contextLost) return;
     clock += dt;
+    game.reducedMotion = reducedMotion.matches;
     game.update(dt);
+    ui.scene.style.opacity = game.action?.id === 'mirror' ? Math.abs(1 - game.visuals.realmMix * 2) : 1;
+    if (game.visuals.cameraYaw !== undefined) {
+      const yaw = reducedMotion.matches && game.action ? game.level.visuals(game.action.to).cameraYaw : game.visuals.cameraYaw;
+      aimCamera(yaw);
+    }
     if (level.update) level.update(game);
     else { level.bridge.rotation.y = game.bridgeAngle; level.wheel.rotation.z = game.bridgeAngle; }
-    level.traveller.position.set(...game.position);
-    level.body.position.y = game.phase === 'moving' ? Math.abs(Math.sin(clock * 11)) * 0.025 : 0;
-    level.body.rotation.y = Math.atan2(game.direction[0], game.direction[2]);
-    for (const part of level.body.children) part.material.opacity = 1 - game.finishProgress;
-    level.shadow.material.opacity = 0.22 * (1 - game.finishProgress);
-    level.traveller.visible = game.phase !== 'won';
+    if (level.updateActors) level.updateActors(game, dt, clock, reducedMotion.matches);
+    else {
+      level.traveller.position.set(...game.position);
+      level.updateTraveller(game, dt, clock, reducedMotion.matches);
+      level.traveller.visible = game.phase !== 'won';
+    }
     if (clock > targetUntil || ['intro', 'finishing', 'won'].includes(game.phase) || game.action) level.destination.visible = false;
     level.portal.material.opacity = 0.7 + game.finishProgress * 0.3;
     syncUI();
@@ -203,6 +233,7 @@ function boot() {
     snapshot: () => game.snapshot(),
     project: (node) => project(game.positionOf(node)),
     seam: () => game.level.seam.length ? ({ near: project(game.positionOf(game.level.seam[0])), far: project(game.positionOf(game.level.seam[1])) }) : null,
+    seams: () => (game.level.seams || []).map(({ nodes, view }) => ({ nodes, view, points: nodes.map((node) => project(game.positionOf(node))) })),
     stops: () => game.level.stops.map((node) => ({ node, ...project(game.positionOf(node)) })),
     pick: (x, y) => removeInput.pick(x, y),
     renderer: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,

@@ -24,7 +24,7 @@ export function findPath(from, to, orientation, edges = edgesFor(orientation)) {
 }
 
 export class Game {
-  constructor(level = LEVELS[0]) { this.level = level; this.reset(); }
+  constructor(level = LEVELS[0]) { this.level = level; this.reducedMotion = false; this.reset(); }
 
   get orientation() { return this.state.orientation; }
   get height() { return this.state.height; }
@@ -41,6 +41,7 @@ export class Game {
     this.phase = 'intro';
     this.node = this.level.start;
     this.state = { ...this.level.initial };
+    if (this.level.actors) this.node = this.state[`${this.state.active}Node`];
     this.visuals = this.level.visuals(this.state);
     this.position = this.positionOf(this.node);
     this.direction = [0, 0, 1];
@@ -107,7 +108,8 @@ export class Game {
     } else if (this.action) {
       this.elapsed += dt;
       const rule = this.level.actions[this.action.id];
-      const progress = Math.min(this.elapsed / rule.duration, 1);
+      const duration = this.reducedMotion ? rule.reducedDuration ?? rule.duration : rule.duration;
+      const progress = Math.min(this.elapsed / duration, 1);
       const t = ease(progress);
       const from = this.level.visuals(this.state), to = this.level.visuals(this.action.to);
       for (const key of Object.keys(from)) {
@@ -119,7 +121,13 @@ export class Game {
       const p = this.positionOf(this.node), q = this.level.position(this.node, this.action.to);
       this.position = p.map((v, i) => v + (q[i] - v) * t);
       if (progress === 1) {
+        if (rule.transformDirection) this.direction = rule.transformDirection(this.direction);
         this.state = this.action.to;
+        if (rule.switchActor) {
+          this.node = this.state[`${this.state.active}Node`];
+          this.position = this.positionOf(this.node);
+          this.direction = [0, 0, 1];
+        }
         if (this.action.id === 'rotate') this.rotations++;
         if (this.action.id === 'lift') this.lifts++;
         if (this.action.id === 'lamp') this.lampMoves++;
@@ -132,7 +140,9 @@ export class Game {
       while (this.path.length && remaining > 0) {
         const next = this.path[0];
         const from = this.positionOf(this.node), to = this.positionOf(next);
-        const seam = this.level.seam.includes(this.node) && this.level.seam.includes(next);
+        const seam = this.level.seams
+          ? this.level.seams.some(({ nodes, view }) => view === this.state.view && nodes.includes(this.node) && nodes.includes(next))
+          : this.level.seam.includes(this.node) && this.level.seam.includes(next);
         const distance = seam ? 0 : Math.hypot(...to.map((v, i) => v - from[i]));
         if (!seam) this.direction = to.map((v, i) => v - from[i]);
         const travel = Math.min(remaining, distance - this.segmentProgress);
@@ -152,6 +162,7 @@ export class Game {
         }
         if (t < 1) break;
         this.node = next;
+        if (this.level.actors) this.state[`${this.state.active}Node`] = next;
         this.path.shift();
         this.segmentProgress = 0;
         if (seam) this.crossings++;
@@ -165,7 +176,7 @@ export class Game {
   }
 
   arrive() {
-    if (this.node === this.level.goal) {
+    if (this.level.isWon ? this.level.isWon(this) : this.node === this.level.goal) {
       this.phase = 'finishing';
       this.elapsed = 0;
       this.hint = '';
